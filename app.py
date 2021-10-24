@@ -7,17 +7,18 @@ import base64
 
 app = Flask(__name__)
 
-playstore = ____________________________
+playstore = pd.read_csv('data/googleplaystore.csv')
 
-playstore._________(subset = ___________________) 
+playstore.drop_duplicates(subset = 'App', keep = 'first', inplace = True)
 
 # bagian ini untuk menghapus row 10472 karena nilai data tersebut tidak tersimpan pada kolom yang benar
 playstore.drop([10472], inplace=True)
 
-playstore.Category = ___________________________
+playstore.Category = playstore.Category.astype('category')
 
-playstore.Installs = ________.apply(lambda x: x.replace(______))
-________________ = ________.apply(lambda x: x.replace(______))
+playstore.Installs = playstore.Installs.apply(lambda x: x.replace(',',''))
+playstore.Installs = playstore.Installs.apply(lambda x: x.replace('+',''))
+playstore.Installs = playstore.Installs.astype('int64')
 
 # Bagian ini untuk merapikan kolom Size, Anda tidak perlu mengubah apapun di bagian ini
 playstore['Size'].replace('Varies with device', np.nan, inplace = True ) 
@@ -27,11 +28,11 @@ playstore.Size = (playstore.Size.replace(r'[kM]+$', '', regex=True).astype(float
             .replace(['k','M'], [10**3, 10**6]).astype(int))
 playstore['Size'].fillna(playstore.groupby('Category')['Size'].transform('mean'),inplace = True)
 
-________ = _______.apply(lambda x: x.replace(______))
-________ = __________________________________
+playstore.Price = playstore.Price.apply(lambda x: x.replace('$',''))
+playstore.Price = playstore.Price.astype('float64')
 
 # Ubah tipe data Reviews, Size, Installs ke dalam tipe data integer
-___________________________________________________________________________________
+playstore[['Reviews', 'Size', 'Installs']] = playstore[['Reviews', 'Size', 'Installs']].astype('int64')
 
 @app.route("/")
 # This fuction for rendering the table
@@ -39,26 +40,32 @@ def index():
     df2 = playstore.copy()
 
     # Statistik
-    top_category = ______________________________
+    top_category = pd.crosstab(
+    index=df2['Category'],
+    columns= 'Jumlah',
+    values=df2['Category'],
+    aggfunc='count'
+    ).sort_values('Jumlah', ascending=False).reset_index()
     # Dictionary stats digunakan untuk menyimpan beberapa data yang digunakan untuk menampilkan nilai di value box dan tabel
     stats = {
-        'most_categories' : __________,
-        'total': ____________,
-        'rev_table' : ___________________.to_html(classes=['table thead-light table-striped table-bordered table-hover table-sm'])
+        'most_categories' : top_category['Category'].iloc[0],
+        'total': top_category['Jumlah'].iloc[0],
+        'rev_table' : df2[['Category', 'App', 'Reviews', 'Rating']].sort_values('Reviews', ascending=False).head(10).reset_index().to_html(classes=['table thead-light table-striped table-bordered table-hover table-sm'])
     }
 
     ## Bar Plot
-    cat_order = df2.groupby(_______).agg({
-    _________ : _________
-        }).rename({'Category':'Total'}, axis=1).sort_values(__________).head()
-    X = _____________
-    Y = _____________
-    my_colors = 'rgbkymc'
+    cat_order = df2.groupby(by = 'Category').agg({
+    'Category' : 'count'
+    }).rename({'Category':'Total'}, axis=1).sort_values('Total', ascending=False).reset_index().head()
+    X = cat_order['Category']
+    Y = cat_order['Total']
+    #my_colors = 'rgbkymc'
+    my_colors = ['r', 'g', 'b','k', 'y','m','c']
     # bagian ini digunakan untuk membuat kanvas/figure
     fig = plt.figure(figsize=(8,3),dpi=300)
     fig.add_subplot()
     # bagian ini digunakan untuk membuat bar plot
-    plt.barh(____,_____, color=my_colors)
+    plt.barh(X,Y, color=my_colors)
     # bagian ini digunakan untuk menyimpan plot dalam format image.png
     plt.savefig('cat_order.png',bbox_inches="tight") 
 
@@ -72,13 +79,13 @@ def index():
     result = str(figdata_png)[2:-1]
     
     ## Scatter Plot
-    X = df2[______].values # axis x
-    Y = df2[______].values # axis y
-    area = playstore[_______].values/10000000 # ukuran besar/kecilnya lingkaran scatter plot
+    X = df2['Reviews'].values # axis x
+    Y = df2['Rating'].values # axis y
+    area = playstore['Installs'].values/10000000 # ukuran besar/kecilnya lingkaran scatter plot
     fig = plt.figure(figsize=(5,5))
     fig.add_subplot()
     # isi nama method untuk scatter plot, variabel x, dan variabel y
-    plt._______(x=_____,y=______, s=area, alpha=0.3)
+    plt.scatter(x=X,y=Y, s=area, alpha=0.3)
     plt.xlabel('Reviews')
     plt.ylabel('Rating')
     plt.savefig('rev_rat.png',bbox_inches="tight")
@@ -90,10 +97,10 @@ def index():
     result2 = str(figdata_png)[2:-1]
 
     ## Histogram Size Distribution
-    X=(___________/1000000).values
+    X=(df2['Size']/1000000).values
     fig = plt.figure(figsize=(5,5))
     fig.add_subplot()
-    plt._______(_____,bins=100, density=True,  alpha=0.75)
+    plt.hist(X,bins=100, density=True,  alpha=0.75)
     plt.xlabel('Size')
     plt.ylabel('Frequency')
     plt.savefig('hist_size.png',bbox_inches="tight")
@@ -105,12 +112,28 @@ def index():
     result3 = str(figdata_png)[2:-1]
 
     ## Buatlah sebuah plot yang menampilkan insight di dalam data 
-    ____________________________
-    ____________________________
-    ____________________________
+    CR_order = df2.groupby(by = 'Content Rating').agg({
+    'Content Rating' : 'count'
+    }).rename({'Content Rating':'Total'}, axis=1).sort_values('Total', ascending=False).reset_index().head()
+    X = CR_order['Content Rating']
+    Y = CR_order['Total']
+    my_colors = ['r', 'g', 'b','k', 'y','m','c']
+    # bagian ini digunakan untuk membuat kanvas/figure
+    fig = plt.figure(figsize=(8,8),dpi=300)
+    fig.add_subplot()
+    # bagian ini digunakan untuk membuat bar plot
+    plt.bar(X,Y, color=my_colors)
+    # bagian ini digunakan untuk menyimpan plot dalam format image.png
+    plt.savefig('CR_order.png',bbox_inches="tight") 
+
+    figfile = BytesIO()
+    plt.savefig(figfile, format='png')
+    figfile.seek(0)
+    figdata_png = base64.b64encode(figfile.getvalue())
+    result4 = str(figdata_png)[2:-1]
 
     # Tambahkan hasil result plot pada fungsi render_template()
-    return render_template('index.html', stats=stats, result=result, result2=result2, result3=result3)
+    return render_template('index.html', stats=stats, result=result, result2=result2, result3=result3, result4=result4)
 
 if __name__ == "__main__": 
     app.run(debug=True)
