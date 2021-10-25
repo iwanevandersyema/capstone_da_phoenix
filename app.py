@@ -50,7 +50,7 @@ def index():
     stats = {
         'most_categories' : top_category['Category'].iloc[0],
         'total': top_category['Jumlah'].iloc[0],
-        'rev_table' : df2[['Category', 'App', 'Reviews', 'Rating']].sort_values('Reviews', ascending=False).head(10).reset_index().drop(columns='index').to_html(classes=['table thead-light table-striped table-bordered table-hover table-sm'])
+        'rev_table' : df2.groupby(['Category','App']).agg({'Reviews':'sum', 'Rating':'mean'}).sort_values(by='Reviews', ascending=False).reset_index().head(10).to_html(classes=['table thead-light table-striped table-bordered table-hover table-sm'])
     }
 
     ## Bar Plot
